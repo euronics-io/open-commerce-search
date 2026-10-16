@@ -104,6 +104,16 @@ public class FacetDependencyFilterTest {
 	}
 
 	@Test
+	public void testMixedCaseDependencyOnPathFilter() {
+		FacetConfig config = new FacetConfig("Size", "size").setFilterDependencies("category=Home %26 Garden/Washing Machines");
+		FacetDependencyFilter underTest = new FacetDependencyFilter(Collections.singletonMap("size", config));
+		Facet facet = new Facet("size");
+		assertTrue(underTest.isVisibleFacet(facet, config, contextOfFilters("category=Home & Garden/Washing Machines"), 0));
+		assertTrue(underTest.isVisibleFacet(facet, config, contextOfFilters("category=Home & Garden/Washing Machines/Front Loaders"), 0));
+		assertFalse(underTest.isVisibleFacet(facet, config, contextOfFilters("category=Home & Garden"), 0));
+	}
+
+	@Test
 	public void testMultiValueFilterDependency() {
 		FacetConfig sizeFacetConfig = new FacetConfig("Size", "size").setFilterDependencies("color=red,black");
 		Map<String, FacetConfig> facetConfigs = Collections.singletonMap("size", sizeFacetConfig);
@@ -129,8 +139,8 @@ public class FacetDependencyFilterTest {
 		Facet sizeFacet = new Facet("size");
 
 		assertFalse(underTest.isVisibleFacet(sizeFacet, sizeFacetConfig, contextOfFilters("category=a"), 0));
-		// path-filters are case sensitive
-		assertFalse(underTest.isVisibleFacet(sizeFacet, sizeFacetConfig, contextOfFilters("category=A/B"), 0));
+		// dependency values are matched case-insensitive
+		assertTrue(underTest.isVisibleFacet(sizeFacet, sizeFacetConfig, contextOfFilters("category=A/B"), 0));
 		assertTrue(underTest.isVisibleFacet(sizeFacet, sizeFacetConfig, contextOfFilters("category=a/b"), 0));
 
 		assertFalse(underTest.isVisibleFacet(sizeFacet, sizeFacetConfig, contextOfFilters("category=c"), 0));

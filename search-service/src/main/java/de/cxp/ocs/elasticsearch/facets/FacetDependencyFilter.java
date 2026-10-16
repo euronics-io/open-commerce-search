@@ -76,7 +76,9 @@ public class FacetDependencyFilter implements FacetFilter {
 
 				String[] filterValues = internalResultFilter.getValues();
 				int expectedValuesMatches = filterCondition.values.size();
-				for (String activeFilter : filterValues) {
+				for (String rawActiveFilter : filterValues) {
+					// dependency values are lower-cased in parse()
+					String activeFilter = rawActiveFilter.toLowerCase(Locale.ROOT);
 					if (filterCondition.values.contains(activeFilter)) {
 						expectedValuesMatches--;
 					}
