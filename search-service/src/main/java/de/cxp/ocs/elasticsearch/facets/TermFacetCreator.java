@@ -132,8 +132,8 @@ public class TermFacetCreator extends NestedFacetCreator {
 				// However N of those are variants that are already counted with their main document).
 				// => the count that might come next to reality is the greater one of two same name entries
 				if (prevEntry.docCount < additionalEntry.docCount) {
-					prevEntry.docCount = additionalEntry.docCount;
 					first.absoluteFacetCoverage += additionalEntry.docCount - prevEntry.docCount;
+					prevEntry.docCount = additionalEntry.docCount;
 				}
 			}
 		}
