@@ -292,6 +292,8 @@ class FacetCreatorInitializer {
 				if (!explicitConfigs.isEmpty()) {
 					NestedFacetCreator explicitFacetCreator = createExplicitFacetCreator(facetType, explicitConfigs);
 					if (explicitFacetCreator == null) continue;
+					// the names aggregation is limited to maxFacets: all explicitly configured facets have to fit in
+					explicitFacetCreator.setMaxFacets(Math.max(maxFacets, explicitConfigs.size()));
 					explicitFacetCreator.setUniqueAggregationName("Explicit" + facetType + "Aggregation");
 					if (onVariantLevel) {
 						facetCreatorsByTypes.put(facetClassifier, new VariantFacetCreator(Collections.singleton(explicitFacetCreator)));

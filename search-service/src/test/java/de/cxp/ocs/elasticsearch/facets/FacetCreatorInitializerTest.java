@@ -22,6 +22,7 @@ import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.MultiBucketsAggregation;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms.Bucket;
+import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
 import org.junit.jupiter.api.Test;
 
 import de.cxp.ocs.config.*;
@@ -127,6 +128,20 @@ public class FacetCreatorInitializerTest {
 		AggregationBuilder genericTermAgg = genericFacetCreator.buildAggregation(null);
 		AggregationBuilder explicitTermAgg = explicitFacetCreator.buildAggregation(null);
 		assertNotEquals(genericTermAgg.getName(), explicitTermAgg.getName());
+	}
+
+	@Test
+	public void testAllMandatoryFacetsFitIntoNamesAggregation() {
+		FacetCreatorInitializer underTest = new FacetCreatorInitializer(noCustomFacetCreators, defaultTermFacetProvider, defaultNumberFacetProvider, Locale.ROOT, 12);
+		for (String name : new String[] { "m1", "m2", "m3", "m4" }) {
+			FacetConfig mandatoryFacetConfig = new FacetConfig(name, name).setType(FacetType.TERM.name()).setMinFacetCoverage(0).setExcludeFromFacetLimit(true);
+			underTest.addFacet(new Field(name).setType(FieldType.STRING).setFieldLevel(FieldLevel.MASTER), mandatoryFacetConfig);
+		}
+		TermFacetCreator explicitFacetCreator = assertInstanceOfAndGet(underTest.init().get(new FacetCreatorClassifier(false, FacetType.TERM.name(), true)), TermFacetCreator.class);
+
+		AggregationBuilder filteredAgg = explicitFacetCreator.buildAggregation(null).getSubAggregations().iterator().next();
+		TermsAggregationBuilder namesAgg = (TermsAggregationBuilder) filteredAgg.getSubAggregations().iterator().next();
+		assertTrue(namesAgg.size() >= 4, () -> "names aggregation size: " + namesAgg.size());
 	}
 
 	@Test
