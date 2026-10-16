@@ -114,7 +114,7 @@ class QueryPredictor {
 			predictedQuery.matchCount = scoreBucket.getDocCount();
 			predictedQuery.termsUnique.putAll(matchingTerms);
 			applyTermMatches(inputTerms, shingleSources, predictedQuery, correctedWords);
-			hasFoundQueryWithAllTermsMatching ^= predictedQuery.isContainsAllTerms();
+			hasFoundQueryWithAllTermsMatching |= predictedQuery.isContainsAllTerms();
 
 			// if one of the searched terms matches documents but also has
 			// "spell corrections",
