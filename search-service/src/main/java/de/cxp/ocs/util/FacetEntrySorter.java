@@ -19,6 +19,9 @@ import de.cxp.ocs.model.result.HierarchialFacetEntry;
 
 public class FacetEntrySorter {
 
+	// case-insensitive, the natural order as tie-breaker keeps the result stable
+	private final static Comparator<String> ALPHANUM_COMPARATOR = String.CASE_INSENSITIVE_ORDER.thenComparing(Comparator.naturalOrder());
+
 	public final static FacetEntrySorter NOOP = new FacetEntrySorter(null, 0);
 
 	private final static EnumMap<ValueOrder, FacetEntrySorter> DEFAULT_INSTANCES = new EnumMap<>(ValueOrder.class);
@@ -57,9 +60,9 @@ public class FacetEntrySorter {
 	private Comparator<FacetEntry> initComparators(ValueOrder valueOrder) {
 		switch (valueOrder) {
 			case ALPHANUM_ASC:
-				return Comparator.comparing(FacetEntry::getKey);
+				return Comparator.comparing(FacetEntry::getKey, ALPHANUM_COMPARATOR);
 			case ALPHANUM_DESC:
-				return Comparator.comparing(FacetEntry::getKey).reversed();
+				return Comparator.comparing(FacetEntry::getKey, ALPHANUM_COMPARATOR).reversed();
 			case HUMAN_NUMERIC_ASC:
 				return Comparator.comparing(this::parseNumber).thenComparing(FacetEntry::getKey);
 			case HUMAN_NUMERIC_DESC:

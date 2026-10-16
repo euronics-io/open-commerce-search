@@ -42,6 +42,18 @@ public class FacetEntrySorterTest {
 	}
 
 	@Test
+	public void testAlphaNumSorterIgnoresCase() {
+		Facet brands = new Facet("brand")
+				.addEntry(new FacetEntry("Zanussi", "z", 1, "", false))
+				.addEntry(new FacetEntry("dyson", "d", 1, "", false))
+				.addEntry(new FacetEntry("Bosch", "b", 1, "", false));
+		FacetEntrySorter.of(ValueOrder.ALPHANUM_ASC, 3).sort(brands);
+		assertEquals("Bosch", brands.getEntries().get(0).key);
+		assertEquals("dyson", brands.getEntries().get(1).key);
+		assertEquals("Zanussi", brands.getEntries().get(2).key);
+	}
+
+	@Test
 	public void testAlphaNumDescSorter() {
 		FacetEntrySorter.of(ValueOrder.ALPHANUM_DESC, 12).sort(testFacet);
 		assertEquals("Beta", testFacet.getEntries().get(0).key);
