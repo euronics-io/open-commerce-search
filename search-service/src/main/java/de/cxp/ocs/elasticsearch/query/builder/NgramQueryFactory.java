@@ -98,11 +98,14 @@ public class NgramQueryFactory implements ESQueryFactory {
 		String queryName = getLabel(parsedQuery.getSearchQuery());
 		mainQuery.queryName(queryName);
 
-		MultiMatchQueryBuilder variantQuery = buildEsQuery(searchPhrase);
+		// without explicit fields a multi-match query is expanded to all fields of the index, which fails if there are
+		// more fields than the field-expansion limit
+		QueryBuilder variantQuery = QueryBuilders.matchAllQuery();
 		if (!variantFields.isEmpty()) {
-			variantQuery.fields(variantFields);
+			variantQuery = buildEsQuery(searchPhrase)
+					.fields(variantFields)
+					.queryName("variant-" + queryName);
 		}
-		variantQuery.queryName("variant-" + queryName);
 
 		// isWithSpellCorrect=true because ngram is kind of a fuzzy matching
 		return new TextMatchQuery<>(mainQuery, variantQuery, true,
