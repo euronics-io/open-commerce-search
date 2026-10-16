@@ -411,7 +411,8 @@ public class QuerySuggestManager implements AutoCloseable {
 				// the config here. This has to be done at the instantiation of that according SDP
 				sdp = loadedSDPs.next();
 			}
-			catch (Exception e) {
+			// a failing constructor surfaces as ServiceConfigurationError, which is an Error
+			catch (Exception | ServiceConfigurationError e) {
 				log.warn("failed to load a data provider", e);
 			}
 			if (sdp != null) {

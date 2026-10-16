@@ -48,6 +48,17 @@ class QuerySuggestManagerTest {
 	}
 
 	@Test
+	void failingDataProviderDoesNotAffectOthers() {
+		// util.FailingDataProvider is registered as service and throws on instantiation
+		querySuggestManager = QuerySuggestManager.builder()
+				.withSuggestDataProvider(serviceMock)
+				.setMinimalUpdateRate()
+				.build();
+
+		assertThat(querySuggestManager.getQuerySuggester(testTenant1)).isNotNull();
+	}
+
+	@Test
 	void basicTest() throws Exception {
 		serviceMock.updateSuggestions(testTenant1, Collections.emptyList());
 		querySuggestManager = QuerySuggestManager.builder()
