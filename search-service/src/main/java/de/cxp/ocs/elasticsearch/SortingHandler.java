@@ -80,13 +80,14 @@ public class SortingHandler {
 	void applySorting(List<SortInstruction> sortings, SearchSourceBuilder searchSourceBuilder) {
 		boolean addedSorting = false;
 		for (SortInstruction sorting : sortings) {
-			SortOptionConfiguration sortConf = sortConfigIndex.get(sortStringRepresentation(sorting.getField().getName(), sorting.getSortOrder()));
-			String missingParam = sortConf != null ? sortConf.getMissing() : null;
 			Field sortField = sorting.getField();
 			if (sortField == null) {
 				log.debug("tried to sort by an unsortable field {}", sorting.getRawSortValue());
+				continue;
 			}
-			else if (sortField.hasUsage(FieldUsage.SORT)) {
+			SortOptionConfiguration sortConf = sortConfigIndex.get(sortStringRepresentation(sortField.getName(), sorting.getSortOrder()));
+			String missingParam = sortConf != null ? sortConf.getMissing() : null;
+			if (sortField.hasUsage(FieldUsage.SORT)) {
 				searchSourceBuilder.sort(
 						SortBuilders.fieldSort(FieldConstants.SORT_DATA + "." + sortField.getName())
 								.order(mapSortOrder(sorting.getSortOrder()))
@@ -170,8 +171,8 @@ public class SortingHandler {
 	List<SortBuilder<?>> getVariantSortings(List<SortInstruction> sortings) {
 		List<SortBuilder<?>> variantSortings = sortings.isEmpty() ? Collections.emptyList() : new ArrayList<>(sortings.size());
 		for (SortInstruction sorting : sortings) {
-			SortOptionConfiguration sortConf = sortConfigIndex.get(sortStringRepresentation(sorting.getField().getName(), sorting.getSortOrder()));
 			if (sorting.getField() != null && sorting.getField().isVariantLevel()) {
+				SortOptionConfiguration sortConf = sortConfigIndex.get(sortStringRepresentation(sorting.getField().getName(), sorting.getSortOrder()));
 				String missingParam = sortConf != null ? sortConf.getMissing() : null;
 				variantSortings.add(
 						SortBuilders
