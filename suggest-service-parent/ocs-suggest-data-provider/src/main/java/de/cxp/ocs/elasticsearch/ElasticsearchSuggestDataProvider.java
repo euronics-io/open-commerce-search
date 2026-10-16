@@ -1,5 +1,6 @@
 package de.cxp.ocs.elasticsearch;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.nio.charset.StandardCharsets;
@@ -16,9 +17,7 @@ import org.elasticsearch.action.admin.indices.settings.get.GetSettingsResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestHighLevelClient;
-import org.elasticsearch.client.RestHighLevelClientBuilder;
 import org.elasticsearch.client.core.CountRequest;
 import org.elasticsearch.client.core.CountResponse;
 import org.elasticsearch.client.indices.GetIndexRequest;
@@ -45,7 +44,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @SuppressWarnings("deprecation")
-public class ElasticsearchSuggestDataProvider implements SuggestDataProvider {
+public class ElasticsearchSuggestDataProvider implements SuggestDataProvider, Closeable {
 
 	private final static String EMPTY_STRING = "";
 	private static final String _NESTED      = "_nested";
@@ -60,12 +59,15 @@ public class ElasticsearchSuggestDataProvider implements SuggestDataProvider {
 	@Override
 	public void configure(Map<String, Object> config) {
 		settings = new SettingsProxy(config);
-		ConnectionConfiguration connectionConf = settings.getConnectionConfig();
-		log.info("Connecting to Elasticsearch at {}", connectionConf.getHosts());
-		RestClientBuilder restClientBuilder = RestClientBuilderFactory.createRestClientBuilder(connectionConf);
-		client = new RestHighLevelClientBuilder(restClientBuilder.build())
-				.setApiCompatibilityMode(connectionConf.isUseCompatibilityMode())
-				.build();
+		log.info("Connecting to Elasticsearch at {}", settings.getConnectionConfig().getHosts());
+		client = settings.getClient();
+	}
+
+	@Override
+	public void close() throws IOException {
+		if (settings != null) {
+			settings.close();
+		}
 	}
 
 	@Override
@@ -278,7 +280,7 @@ public class ElasticsearchSuggestDataProvider implements SuggestDataProvider {
 		SearchSourceBuilder fetchSource = new SearchSourceBuilder()
 				.size(maxFetchSize)
 				.query(QueryBuilders.existsQuery(prefix + "." + field.getName()))
-				.sort(SortBuilders.fieldSort("_id"))
+				.sort(SortBuilders.fieldSort("_doc"))
 				.fetchSource(prefix + "." + field.getName(), null);
 		SearchResponse searchResponse;
 		do {

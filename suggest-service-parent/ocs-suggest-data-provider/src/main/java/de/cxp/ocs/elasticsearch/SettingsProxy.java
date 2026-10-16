@@ -1,11 +1,13 @@
 package de.cxp.ocs.elasticsearch;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.*;
 
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.RestHighLevelClientBuilder;
 
 import de.cxp.ocs.config.ConnectionConfiguration;
 import de.cxp.ocs.config.Field;
@@ -13,7 +15,8 @@ import de.cxp.ocs.config.FieldConfiguration;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class SettingsProxy {
+@SuppressWarnings("deprecation")
+public class SettingsProxy implements Closeable {
 
 
 	private final Properties defaultProperties;
@@ -27,7 +30,10 @@ public class SettingsProxy {
 
 		loadPropertiesResource("ocs-suggest.properties").ifPresent(defaultProperties::putAll);
 
-		defaultProperties.putAll(config);
+		// Properties only returns String values, but e.g. HOCON delivers numbers and booleans
+		config.forEach((k, v) -> {
+			if (v != null) defaultProperties.setProperty(k, String.valueOf(v));
+		});
 	}
 
 	private Optional<Properties> loadPropertiesResource(String resourceName) {
@@ -85,7 +91,28 @@ public class SettingsProxy {
 		return Optional.ofNullable(get("suggest.index." + indexName + ".enable")).map(Boolean::parseBoolean);
 	}
 
-	RestHighLevelClient restHighLevelClient;
+	private RestHighLevelClient client;
+
+	/**
+	 * The client is created on first use and shared, it is closed by {@link #close()}.
+	 */
+	public synchronized RestHighLevelClient getClient() {
+		if (client == null) {
+			ConnectionConfiguration connectionConf = getConnectionConfig();
+			client = new RestHighLevelClientBuilder(RestClientBuilderFactory.createRestClientBuilder(connectionConf).build())
+					.setApiCompatibilityMode(connectionConf.isUseCompatibilityMode())
+					.build();
+		}
+		return client;
+	}
+
+	@Override
+	public synchronized void close() throws IOException {
+		if (client != null) {
+			client.close();
+			client = null;
+		}
+	}
 
 	public List<Field> getSourceFields(String indexName) throws IOException {
 		String sourceFieldProperty = get("suggest.index." + indexName + ".sourceFields");
@@ -97,11 +124,7 @@ public class SettingsProxy {
 		}
 		String[] fieldNames = sourceFieldProperty.split(",");
 
-		if (restHighLevelClient == null) {
-			restHighLevelClient = new RestHighLevelClient(RestClientBuilderFactory.createRestClientBuilder(getConnectionConfig()));
-		}
-
-		FieldConfiguration fieldConfig = new FieldConfigFetcher(restHighLevelClient).fetchConfig(indexName);
+		FieldConfiguration fieldConfig = new FieldConfigFetcher(getClient()).fetchConfig(indexName);
 		List<Field> sourceFields = new ArrayList<>(fieldNames.length);
 		for (String fieldName : fieldNames) {
 			Field sourceField = fieldConfig.getField(fieldName);
@@ -109,7 +132,7 @@ public class SettingsProxy {
 				sourceFields.add(sourceField);
 			}
 			else {
-				log.warn("source field {} was configured but does not exist at index {}", null, indexName);
+				log.warn("source field {} was configured but does not exist at index {}", fieldName, indexName);
 			}
 		}
 		
