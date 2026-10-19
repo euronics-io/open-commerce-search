@@ -20,6 +20,7 @@
 - [Customizing](#customizing)
   - [Adding or changing Elasticsearch settings](#adding-or-changing-elasticsearch-settings)
   - [Modifying data](#modifying-data)
+  - [Ranking rules](#ranking-rules)
 
 
 ## Overview
@@ -334,5 +335,68 @@ For example to normalize brands only for their facet appearance or strip irrelev
 In such cases you can use a `DataPostProcessor` that has access to all the super fields listed above.
 
 These processors can be included into the Ingester using the [plugin mechanics](plugin_guide.md)
+
+### Ranking rules
+
+The `RankingRulesDataProcessor` boosts or demotes products at index time. It evaluates a list of rules for every document and writes the product of the factors of all matching rules into one numeric data field (default name `rankFactor`). If no rule matches, the value is 1. The final factor is clamped to `[min, max]` (defaults `0.05` and `5`) so that a combination of rules can not dominate the search.
+
+Typical use cases are demoting accessories, boosting products with a recent model year (a product attribute) or boosting best sellers (a numeric data field).
+
+The processor needs to be activated and the score field must be declared with usage `score`. Each rule is one entry `rule.<id>` with a JSON object as value:
+
+```yaml
+ocs:
+  index-config:
+    my-index:   # or use default-index-config instead of index-config
+      data-processor-configuration:
+        processors:
+          - RankingRulesDataProcessor
+        configuration:
+          "[de.cxp.ocs.preprocessor.impl.RankingRulesDataProcessor]":
+            destination: rankFactor   # optional, default: rankFactor
+            min: "0.05"               # optional clamp, default: 0.05
+            max: "5"                  # optional clamp, default: 5
+            "[rule.accessories]": '{"source":"category","patterns":["accessories","regex:^spare\\s+parts"],"factor":0.3}'
+            "[rule.best-sellers]": '{"source":"field","field":"salesRank","op":"<=","value":100,"factor":1.3}'
+            "[rule.recent-models]": '{"source":"attribute","field":"model year","op":">=","value":2024,"factor":1.2}'
+            "[rule.premium-accessories]": '{"source":"productGroup","patterns":["exact:premium cables"],"factor":3,"requires":"accessories"}'
+      field-configuration:
+        fields:
+          rankFactor:
+            name: rankFactor
+            type: number
+            usage:
+              - Score
+```
+
+Rule properties:
+
+| property | description |
+|---|---|
+| `source` | `category`, `productGroup`, `title`, `brand`, `keywords` (text rules), `field` or `attribute` (numeric rules) |
+| `patterns` | text rules only, list of patterns. A plain pattern is a case-insensitive substring match after folding (lower case, umlauts transliterated, other diacritics removed). Prefix `exact:` requires the whole value to be equal (folded), prefix `regex:` is a Java regular expression that is searched in the original text (case-insensitive). The rule matches if any pattern matches any value. `category` checks the names on every level of every category path, `keywords` every single keyword. |
+| `field`, `op`, `value` | numeric rules only. `op` is one of `==`, `>=`, `<=`, `>`, `<`. For `source: field` the data field name is expected (numeric or boolean, `true` is 1), for `source: attribute` the exact, case-sensitive attribute name. An attribute rule matches if any attribute with that name has a plain number as value (optional sign, decimal point or comma, no units or other text) that fulfills the comparison. Missing or non-numeric values never match. |
+| `factor` | multiplier that is applied if the rule matches (default 1). If several rules match, their factors are multiplied. |
+| `requires` | optional id of another rule. This rule only counts, if the other rule matched too (e.g. to cancel a demotion for exceptions). |
+| `enabled` | optional, default `true`. Disabled rules are ignored. |
+
+Rules that can not be parsed (unknown source, missing property, invalid JSON, invalid regex) are ignored and an error is logged at indexing start.
+
+To consume the score field, add a `field_value_factor` function for it to the [scoring configuration](configuration.md#scoring-configuration) of the search service. With `missing: 1` documents without a value are not changed. Using `multiply` as boost mode, the text relevance is multiplied with the factor:
+
+```yaml
+ocs:
+  default-tenant-config:   # or a specific tenant configuration
+    scoring-configuration:
+      boost-mode: multiply
+      score-mode: multiply
+      score-functions:
+        - type: field_value_factor
+          field: rankFactor
+          options:
+            missing: 1
+```
+
+Limits: the rules are applied at index time, so a change of the rules (or of the data they are based on) is only visible after a re-index. Further signals that change more often can be configured as additional score functions of the search service.
 
 [back to top](#)
