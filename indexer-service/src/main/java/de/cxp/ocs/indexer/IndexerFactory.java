@@ -44,6 +44,7 @@ public class IndexerFactory {
 		docPreProcessorRegistry.register(AttributeToDataFieldConverter.class, AttributeToDataFieldConverter::new);
 		docPreProcessorRegistry.register(ExtractCategoryLevelDataProcessor.class, ExtractCategoryLevelDataProcessor::new);
 		docPreProcessorRegistry.register(FlagFieldDataProcessor.class, FlagFieldDataProcessor::new);
+		docPreProcessorRegistry.register(RankingRulesDataProcessor.class, RankingRulesDataProcessor::new);
 		docPreProcessorRegistry.register(RemoveFieldContentDelimiterProcessor.class, RemoveFieldContentDelimiterProcessor::new);
 		docPreProcessorRegistry.register(RemoveValuesDataProcessor.class, RemoveValuesDataProcessor::new);
 		docPreProcessorRegistry.register(ReplacePatternInValuesDataProcessor.class, ReplacePatternInValuesDataProcessor::new);
