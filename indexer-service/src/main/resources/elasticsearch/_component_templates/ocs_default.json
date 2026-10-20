@@ -163,6 +163,53 @@
     "mappings": {
       "dynamic_templates": [
         {
+          "result_data_long": {
+            "path_match": "*resultData.*",
+            "match_mapping_type": "long",
+            "mapping": {
+              "type": "double",
+              "index": false
+            }
+          }
+        },
+        {
+          "result_data_double": {
+            "path_match": "*resultData.*",
+            "match_mapping_type": "double",
+            "mapping": {
+              "type": "double",
+              "index": false
+            }
+          }
+        },
+        {
+          "sort_data_long": {
+            "path_match": "*sortData.*",
+            "match_mapping_type": "long",
+            "mapping": {
+              "type": "float"
+            }
+          }
+        },
+        {
+          "sort_data_double": {
+            "path_match": "*sortData.*",
+            "match_mapping_type": "double",
+            "mapping": {
+              "type": "float"
+            }
+          }
+        },
+        {
+          "scores_long": {
+            "path_match": "*scores.*",
+            "match_mapping_type": "long",
+            "mapping": {
+              "type": "float"
+            }
+          }
+        },
+        {
           "result_data": {
             "path_match": "*resultData.*",
             "mapping": {
