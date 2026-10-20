@@ -129,9 +129,12 @@ They configure how the index data should be scaled (replicated) and how fast dat
 
 ```yaml
     index-settings:
+      shard-count: 1
       replica-count: 2
       refresh-interval: 10s
 ```
+
+`shard-count` is the number of primary shards of newly created indices. If it is not set, the cluster or index template default is used. As a rule of thumb a shard should hold 10-50 GB of data, so small indices need only one. The shard count is fixed at index creation, so a change takes effect with the next full import.
 
 [back to top](#)
 
