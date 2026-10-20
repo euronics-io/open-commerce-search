@@ -44,6 +44,8 @@ public class ElasticsearchIndexer extends AbstractIndexer {
 	private final String	INDEX_PREFIX		= "ocs" + INDEX_DELIMITER;
 	private final Pattern	INDEX_NAME_PATTERN	= Pattern.compile(Pattern.quote(INDEX_PREFIX) + "(\\d+)\\" + INDEX_DELIMITER);
 
+	private static final int MAX_LOGGED_BULK_FAILURES = 10;
+
 	private final IndexSettings				indexSettings;
 	private final RestHighLevelClient		restClient;
 	private final ElasticsearchIndexClient	indexClient;
@@ -224,17 +226,18 @@ public class ElasticsearchIndexer extends AbstractIndexer {
 			int failures = 0;
 			for (BulkItemResponse responseItem : bulkResponse.getItems()) {
 				if (responseItem.isFailed()) {
-					if (failures++ == 0) {
-						log.warn("First failure in bulk: {}", responseItem.getFailureMessage());
+					if (failures++ < MAX_LOGGED_BULK_FAILURES) {
+						log.error("Failed to index document '{}': {}", responseItem.getId(), responseItem.getFailureMessage());
 					}
 				}
 				else {
 					success++;
 				}
 			}
-			if (failures > 1) {
-				log.warn("{} bulk insertions failed. {} successes", failures, success);
+			if (failures > MAX_LOGGED_BULK_FAILURES) {
+				log.error("{} more bulk insertions failed (not logged individually)", failures - MAX_LOGGED_BULK_FAILURES);
 			}
+			log.error("{} bulk insertions failed. {} successes", failures, success);
 			return success;
 		}
 		else {

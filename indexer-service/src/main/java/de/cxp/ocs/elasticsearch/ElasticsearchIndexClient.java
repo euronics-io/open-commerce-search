@@ -257,9 +257,39 @@ class ElasticsearchIndexClient {
 			}
 		}
 		if (docCount > 0) {
-			return Optional.ofNullable(highLevelClient.bulk(bulkIndexRequest, RequestOptions.DEFAULT));
+			return Optional.of(bulkWithMappingConflictRetry(bulkIndexRequest));
 		}
 		else return Optional.empty();
+	}
+
+	/**
+	 * On indexes with several primary shards, each shard of one bulk request
+	 * may propose its own dynamic mapping for the same new field (e.g. long
+	 * and float). Only one proposal is accepted, the documents of the other
+	 * shards fail with "cannot be changed from type". As the mapping is
+	 * settled afterwards, these documents are sent once more.
+	 */
+	private BulkResponse bulkWithMappingConflictRetry(BulkRequest request) throws IOException {
+		BulkResponse response = highLevelClient.bulk(request, RequestOptions.DEFAULT);
+		if (!response.hasFailures()) return response;
+
+		BulkRequest retryRequest = new BulkRequest();
+		List<Integer> retryPositions = new ArrayList<>();
+		BulkItemResponse[] items = response.getItems();
+		for (int i = 0; i < items.length; i++) {
+			if (items[i].isFailed() && items[i].getFailureMessage().contains("cannot be changed from type")) {
+				retryRequest.add(request.requests().get(items[i].getItemId()));
+				retryPositions.add(i);
+			}
+		}
+		if (retryPositions.isEmpty()) return response;
+
+		log.info("retrying {} documents that failed because of a dynamic mapping conflict", retryPositions.size());
+		BulkItemResponse[] retryItems = highLevelClient.bulk(retryRequest, RequestOptions.DEFAULT).getItems();
+		for (int i = 0; i < retryItems.length; i++) {
+			items[retryPositions.get(i)] = retryItems[i];
+		}
+		return new BulkResponse(items, response.getTook().millis());
 	}
 
 	private IndexRequest asIndexRequest(String indexName, final IndexableItem record)
@@ -296,7 +326,7 @@ class ElasticsearchIndexClient {
 					if (i == maxBulkSize) {
 						indexedTotal += i;
 						i = 0;
-						responses.add(highLevelClient.bulk(bulkIndexRequest, RequestOptions.DEFAULT));
+						responses.add(bulkWithMappingConflictRetry(bulkIndexRequest));
 						log.info("Indexed {} records", indexedTotal);
 						bulkIndexRequest = new BulkRequest();
 					}
@@ -307,7 +337,7 @@ class ElasticsearchIndexClient {
 			}
 		}
 		if (i > 0) {
-			responses.add(highLevelClient.bulk(bulkIndexRequest, RequestOptions.DEFAULT));
+			responses.add(bulkWithMappingConflictRetry(bulkIndexRequest));
 		}
 		return responses;
 	}
