@@ -114,8 +114,9 @@ public class ElasticsearchIndexer extends AbstractIndexer {
 		String finalIndexName = getNextIndexName(indexName, localizedIndexName);
 
 		try {
-			log.info("creating index {}", finalIndexName);
-			indexClient.createFreshIndex(finalIndexName);
+			log.info("creating index {} with {} primary shard(s), {} replica(s) after import", finalIndexName,
+					indexSettings.shardCount == null ? "default number of" : indexSettings.shardCount, indexSettings.replicaCount);
+			indexClient.createFreshIndex(finalIndexName, indexSettings.shardCount);
 		}
 		catch (Exception e) {
 			throw new IOException("failed to initialize index " + finalIndexName, e);

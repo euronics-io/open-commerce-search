@@ -59,6 +59,7 @@ class ElasticsearchIndexClient {
 	public static final String RECORD_TYPE = "_doc";
 
 	public static final String	ES_SETTINGS_NUMBER_OF_REPLICAS	= "index.number_of_replicas";
+	public static final String	ES_SETTINGS_NUMBER_OF_SHARDS	= "index.number_of_shards";
 	public static final String	ES_SETTINGS_REFRESH_INTERVAL	= "index.refresh_interval";
 
 	private final RestHighLevelClient	highLevelClient;
@@ -109,10 +110,22 @@ class ElasticsearchIndexClient {
 	 * @param indexName
 	 */
 	public void createFreshIndex(String indexName) {
+		createFreshIndex(indexName, null);
+	}
+
+	/**
+	 * @param numberOfShards
+	 *        number of primary shards. If null, the cluster/template default applies.
+	 */
+	public void createFreshIndex(String indexName, Integer numberOfShards) {
 		CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName);
-		createIndexRequest.settings(Settings.builder()
+		Settings.Builder settings = Settings.builder()
 				.put(ES_SETTINGS_NUMBER_OF_REPLICAS, 0)
-				.put(ES_SETTINGS_REFRESH_INTERVAL, "-1"));
+				.put(ES_SETTINGS_REFRESH_INTERVAL, "-1");
+		if (numberOfShards != null) {
+			settings.put(ES_SETTINGS_NUMBER_OF_SHARDS, numberOfShards);
+		}
+		createIndexRequest.settings(settings);
 		try {
 			highLevelClient.indices().create(createIndexRequest, RequestOptions.DEFAULT);
 		}

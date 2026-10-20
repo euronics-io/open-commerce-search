@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import org.elasticsearch.Version;
 import org.elasticsearch.action.admin.indices.get.GetIndexRequest;
+import org.elasticsearch.action.admin.indices.settings.get.GetSettingsRequest;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.CreateIndexRequest;
@@ -90,6 +91,27 @@ public class ElasticsearchIndexerTest {
 		Thread.sleep(1000);
 		assertFalse(indexClient.indices().exists(new GetIndexRequest().indices(abandonedIndex), RequestOptions.DEFAULT));
 		assertTrue(underTest.indexExists(indexName)); // index 2 still exists
+	}
+
+	@Test
+	public void testShardCountIsApplied() throws Exception {
+		IndexSettings settings = new IndexSettings();
+		settings.setMinimumDocumentCount(0);
+		settings.setShardCount(3);
+		ElasticsearchIndexer threeShards = new ElasticsearchIndexer(settings, new FieldConfigIndex(new FieldConfiguration()), indexClient, List.of(), List.of());
+		ImportSession session = threeShards.startImport("test3", "en");
+		assertEquals("3", primaryShards(session.temporaryIndexName));
+	}
+
+	@Test
+	public void testUnsetShardCountKeepsClusterDefault() throws Exception {
+		ImportSession session = underTest.startImport("test4", "en");
+		assertEquals("1", primaryShards(session.temporaryIndexName));
+	}
+
+	private String primaryShards(String index) throws IOException {
+		return indexClient.indices().getSettings(new GetSettingsRequest().indices(index), RequestOptions.DEFAULT)
+				.getSetting(index, "index.number_of_shards");
 	}
 
 }
