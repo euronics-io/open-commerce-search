@@ -9,8 +9,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.FieldSortBuilder;
 import org.elasticsearch.search.sort.NestedSortBuilder;
 import org.elasticsearch.search.sort.SortBuilder;
 import org.elasticsearch.search.sort.SortBuilders;
@@ -75,9 +77,11 @@ public class SortingHandler {
 	 * 
 	 * @param sortings
 	 * @param searchSourceBuilder
-	 * @return a list of potential variant sorts
+	 * @param preferredVariantFilter
+	 *        if not null, sorts on variant-level fields use the value of the variants matching this filter
+	 *        instead of the min/max values on master level
 	 */
-	void applySorting(List<SortInstruction> sortings, SearchSourceBuilder searchSourceBuilder) {
+	void applySorting(List<SortInstruction> sortings, SearchSourceBuilder searchSourceBuilder, QueryBuilder preferredVariantFilter) {
 		boolean addedSorting = false;
 		for (SortInstruction sorting : sortings) {
 			SortOptionConfiguration sortConf = sortConfigIndex.get(sortStringRepresentation(sorting.getField().getName(), sorting.getSortOrder()));
@@ -87,10 +91,15 @@ public class SortingHandler {
 				log.debug("tried to sort by an unsortable field {}", sorting.getRawSortValue());
 			}
 			else if (sortField.hasUsage(FieldUsage.SORT)) {
-				searchSourceBuilder.sort(
-						SortBuilders.fieldSort(FieldConstants.SORT_DATA + "." + sortField.getName())
-								.order(mapSortOrder(sorting.getSortOrder()))
-								.missing(missingParam));
+				FieldSortBuilder fieldSort;
+				if (preferredVariantFilter != null && sortField.isVariantLevel()) {
+					fieldSort = SortBuilders.fieldSort(FieldConstants.VARIANTS + "." + FieldConstants.SORT_DATA + "." + sortField.getName())
+							.setNestedSort(new NestedSortBuilder(FieldConstants.VARIANTS).setFilter(preferredVariantFilter));
+				}
+				else {
+					fieldSort = SortBuilders.fieldSort(FieldConstants.SORT_DATA + "." + sortField.getName());
+				}
+				searchSourceBuilder.sort(fieldSort.order(mapSortOrder(sorting.getSortOrder())).missing(missingParam));
 				addedSorting = true;
 			}
 			// it is possible to sort on a nested facet field including some filtering

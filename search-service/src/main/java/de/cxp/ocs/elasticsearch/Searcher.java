@@ -160,6 +160,11 @@ public class Searcher {
 				.collect(Collectors.toSet());
 	}
 
+	private boolean hasPreferredVariantFilter(InternalSearchParams parameters) {
+		return !preferredVariantAttributes.isEmpty()
+				&& parameters.getFilters().stream().anyMatch(f -> preferredVariantAttributes.contains(f.getField().getName()));
+	}
+
 	public SearchResult find(InternalSearchParams parameters) throws IOException {
 		return find(parameters, new HashMap<>());
 	}
@@ -375,7 +380,9 @@ public class Searcher {
 	private SearchSourceBuilder buildBasicSearchSourceBuilder(InternalSearchParams parameters, SearchQueryContext queryContext) {
 		SearchSourceBuilder searchSourceBuilder = SearchSourceBuilder.searchSource().size(parameters.limit)
 				.from(parameters.offset);
-		sortingHandler.applySorting(parameters.sortings, searchSourceBuilder);
+		// with a preferred variant filter the filtered variant is shown, so variant-level sorts have to use its values
+		QueryBuilder preferredVariantFilter = hasPreferredVariantFilter(parameters) ? queryContext.filters.getVariantInnerHitFilter() : null;
+		sortingHandler.applySorting(parameters.sortings, searchSourceBuilder, preferredVariantFilter);
 
 		if (searchSourceBuilder.sorts() == null || searchSourceBuilder.sorts().isEmpty()) {
 			addRescorersFailsafe(parameters, searchSourceBuilder);
@@ -643,11 +650,11 @@ public class Searcher {
 		srSlice.resultLink = DefaultLinkBuilder.toLink(parameters).toString();
 		srSlice.matchCount = Optional.ofNullable(searchHits.getTotalHits()).map(t -> t.value).orElse(0L) - heroIds.size();
 
-		Map<String, SortOrder> sortedFields = sortingHandler.getSortedNumericFields(parameters);
+		boolean preferredVariantFilter = hasPreferredVariantFilter(parameters);
+		// the value of the preferred variant is shown instead of the min/max range of all variants
+		Map<String, SortOrder> sortedFields = preferredVariantFilter ? Collections.emptyMap() : sortingHandler.getSortedNumericFields(parameters);
 
-		boolean preferVariantHit = VariantPickingStrategy.pickAlways.equals(variantPickingStrategy)
-				|| (!preferredVariantAttributes.isEmpty()
-				&& parameters.getFilters().stream().anyMatch(f -> preferredVariantAttributes.contains(f.getField().getName())));
+		boolean preferVariantHit = VariantPickingStrategy.pickAlways.equals(variantPickingStrategy) || preferredVariantFilter;
 
 		ArrayList<ResultHit> resultHits = new ArrayList<>();
 		for (int i = 0; i < searchHits.getHits().length; i++) {
